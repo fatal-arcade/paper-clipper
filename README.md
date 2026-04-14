@@ -1,8 +1,6 @@
 # PaperClipper
 **A casual, hardware-aware wallpaper manager for Linux.**
 
-![https://www.github.com/fatal-arcade/paper-clipper/PaperClipper.png](https://github.com/fatal-arcade/paper-clipper/blob/main/PaperClipper.png?raw=true)
-
 PaperClipper is a utility born out of a simple frustration: the way many Linux systems "forget" which wallpaper goes on which screen the moment you swap a cable or reboot with a different display configuration. 
 
 The goal of this project is to make multi-display wallpaper assignment persistent and logical, regardless of whether you're on Mint, Fedora, Arch, or any other distro.
