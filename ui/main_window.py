@@ -1,5 +1,5 @@
 import os
-from PySide6.QtWidgets import QMainWindow, QHBoxLayout, QVBoxLayout, QWidget, QFrame, QLabel, QApplication, QCheckBox
+from PySide6.QtWidgets import QMainWindow, QHBoxLayout, QVBoxLayout, QWidget, QFrame, QLabel, QApplication, QCheckBox, QPushButton
 from PySide6.QtGui import QIcon
 from PySide6.QtCore import Qt
 from ui.components import MonitorCanvas
@@ -15,6 +15,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("PaperClipper")
         self.resize(1000, 600)
 
+        #Central
         central = QWidget()
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)
@@ -26,21 +27,36 @@ class MainWindow(QMainWindow):
         self.sidebar.setStyleSheet("background-color: #252526; border-right: 1px solid #333;")
         side_layout = QVBoxLayout(self.sidebar)
 
-        lbl_sidebar = QLabel("SETTINGS")
-        lbl_sidebar.setStyleSheet("color: #aaa; font-weight: bold; font-size: 10px; margin-bottom: 10px;")
-        side_layout.addWidget(lbl_sidebar)
+        # --- Settings Section ---
+        lbl_settings = QLabel("SETTINGS")
+        lbl_settings.setStyleSheet("color: #555; font-weight: bold; font-size: 10px;")
+        side_layout.addWidget(lbl_settings)
 
         # Autostart Checkbox
         self.auto_cb = QCheckBox("Start on Boot")
-        self.auto_cb.setStyleSheet("color: #ccc; font-size: 12px;")
-
-        # NEW: Check actual system state and set the checkbox
+        self.auto_cb.setStyleSheet("color: #ccc;")
         if self.cfg.is_autostart_enabled():
             self.auto_cb.setChecked(True)
-
-        # Check current status (you could store this in settings.json)
         side_layout.addWidget(self.auto_cb)
         self.auto_cb.stateChanged.connect(self.toggle_boot)
+
+        side_layout.addSpacing(20)
+
+        # --- Actions Section ---
+        lbl_actions = QLabel("ACTIONS")
+        lbl_actions.setStyleSheet("color: #555; font-weight: bold; font-size: 10px;")
+        side_layout.addWidget(lbl_actions)
+
+        self.apply_btn = QPushButton("Apply Changes")
+        self.apply_btn.setStyleSheet("""
+                    QPushButton { 
+                        background-color: #0e639c; color: white; border: none; padding: 8px; border-radius: 2px;
+                    }
+                    QPushButton:hover { background-color: #1177bb; }
+                    QPushButton:pressed { background-color: #06436c; }
+                """)
+        self.apply_btn.clicked.connect(self.commit_changes)
+        side_layout.addWidget(self.apply_btn)
 
         side_layout.addStretch()
 
@@ -49,17 +65,44 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.sidebar)
         layout.addWidget(self.canvas)
 
-
-
         self.canvas.display_monitors(monitors)
+
+        # Call the icon loader at the end of init
         self.set_application_icon()
 
+    def commit_changes(self):
+        """Finalizes all staged wallpapers at once."""
+        if not self.canvas.pending_clips:
+            print("Nothing to apply.")
+            return
+
+        # 1. Save all pending items to the JSON config
+        for m_id, path in self.canvas.pending_clips.items():
+            self.cfg.save_clip(m_id, path)
+
+        # 2. Clear the staging area NOW that they are saved
+        self.canvas.pending_clips = {}
+
+        # 3. Pull the full current state from config and push to hardware
+        settings = self.cfg.load_settings()
+        clips = settings.get("clips", {})
+        self.setter.apply_all_saved(self.monitors, clips)
+
+        # 4. Refresh the UI to show the 'staged' highlights are gone
+        self.canvas.display_monitors(self.monitors)
+        print("Hardware state synchronized.")
+
     def set_application_icon(self):
-        path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "icons", "PaperClipper.png")
-        if os.path.exists(path):
-            icon = QIcon(path)
+        # Use the root_dir from our config manager to build a rock-solid path
+        icon_path = self.cfg.root_dir / "assets" / "icons" / "PaperClipper.png"
+
+        if icon_path.exists():
+            icon = QIcon(str(icon_path))
             self.setWindowIcon(icon)
+            # This ensures the icon shows up in the taskbar/dock on GNOME/KDE/Mint
             QApplication.setWindowIcon(icon)
+        else:
+            print(f"DEBUG: Icon not found at {icon_path}")
 
     def handle_wallpaper_selection(self, monitor_id, image_path):
         """Saves the clip and refreshes the entire desktop state."""

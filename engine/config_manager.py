@@ -55,14 +55,14 @@ class ConfigManager:
             python_exe = sys.executable
             script_path = os.path.join(self.root_dir, "main.py")
 
-            content = f"""[Desktop Entry]
+            # Inside the f-string content for toggle_autostart:
+            icon_path = self.root_dir / "assets" / "icons" / "PaperClipper.png"
 
+            content = f"""[Desktop Entry]
 Type=Application
 Name=PaperClipper
 Exec={python_exe} {script_path} --headless
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
+Icon={icon_path}
 Comment=Hardware-aware Wallpaper Manager
             """
             with open(desktop_file, "w") as f:
