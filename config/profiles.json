@@ -1,0 +1,22 @@
+{
+    "profiles": {
+        "default_profile": {
+            "1": {
+                "image": "/home/fatal/Pictures/wallpapers/lbp_00.png",
+                "device_id": "unknown-1",
+                "device_name": "Generic Monitor",
+                "port": "DP-5",
+                "is_active": true,
+                "timestamp": "2026-04-15 08:06:55"
+            },
+            "0": {
+                "image": "/home/fatal/Pictures/wallpapers/lbp_02.png",
+                "device_id": "unknown-0",
+                "device_name": "Generic Monitor",
+                "port": "HDMI-0",
+                "is_active": true,
+                "timestamp": "2026-04-15 08:06:49"
+            }
+        }
+    }
+}
