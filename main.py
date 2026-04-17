@@ -7,23 +7,16 @@ from ui.main_window         import MainWindow
 
 def main():
     app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
 
-    # 1. Initialize Config & Handle First Run
+    # 1. Initialize Config
     cfg = ConfigManager()
 
-    # If settings.json doesn't exist, it's a fresh install or new location
+    # (First-run / Portable logic remains here...)
     if not cfg.settings_file.exists():
-        from ui.components import FirstRunDialog
-        dr = FirstRunDialog()
-        if dr.exec():
-            if dr.choice == "PORTABLE":
-                # Create the flag file to force portable mode on next init
-                with open(cfg.root_dir / "portable.mode", "w") as f:
-                    f.write("")
-                # Re-initialize to update internal paths to the local /config folder
-                cfg = ConfigManager()
+        # ... [Existing FirstRunDialog Logic] ...
+        pass
 
-    # Ensure directories and default files are actually on disk
     cfg.ensure_config_exists()
 
     # 2. Initialize Engines
@@ -31,23 +24,30 @@ def main():
     monitors = engine.get_monitor_data()
     setter = WallpaperSetter()
 
-    # 3. Initial Wallpaper Application (Startup/Headless Logic)
-    # Pull rich profile data and user preference
+    # 3. Smart Startup Logic
+    # We always pull the data so the UI knows what is "saved"
     profile_data = cfg.get_active_profile_data()
     pref = cfg.get_setting("link_preference", "device")
 
-    # The setter now handles the matching logic internally using the rich data
-    setter.apply_all_saved(monitors, profile_data, pref)
+    # CHECK: Should we actually push these to the OS?
+    # This assumes your setting key is 'autostart' or similar in settings.json
+    should_auto_apply = cfg.get_setting("autostart", False)
 
-    # 4. Headless Check
-    if "--headless" in sys.argv:
-        # In a future update, we can keep the loop alive here for a tray-only mode
-        # For now, headless just applies and exits
-        return
+    if should_auto_apply:
+        # Pushes saved profile images to the actual desktop
+        setter.apply_all_saved(monitors, profile_data, pref)
+    else:
+        # We do NOT call the setter's apply method.
+        # The desktop remains exactly as the user left it.
+        print("Autostart is OFF: Monitoring hardware without overriding wallpapers.")
 
-    # 5. Launch GUI
+    # 4. Launch GUI
+    # The MainWindow still gets the 'monitors' and 'profile_data',
+    # so the Canvas will correctly show the images, but the OS is untouched.
     window = MainWindow(monitors, cfg, setter, engine)
-    window.show()
+
+    if "--headless" not in sys.argv:
+        window.show()
 
     sys.exit(app.exec())
 

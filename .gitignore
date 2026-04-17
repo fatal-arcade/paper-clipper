@@ -1,0 +1,18 @@
+# Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python bytecode
+__pycache__/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Secret Files and Folders
+config/
+portable.mode
+

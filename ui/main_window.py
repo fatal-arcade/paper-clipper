@@ -1,7 +1,7 @@
 import os
 from ui.components      import MonitorCanvas
 from PySide6.QtGui      import QIcon, QAction, QGuiApplication
-from PySide6.QtCore     import Qt
+from PySide6.QtCore     import Qt, QTimer
 from PySide6.QtWidgets  import (
     QMainWindow, QHBoxLayout, QVBoxLayout,
     QWidget, QFrame, QLabel, QApplication,
@@ -21,6 +21,20 @@ class MainWindow(QMainWindow):
         self.engine = engine
         self.setWindowTitle("PaperClipper")
         self.resize(1100, 700) # Slightly larger to accommodate the shelf
+
+        # --- 1. The Debounce Timer ---
+        # Hardware events can be noisy; this ensures we only refresh once
+        # after the hardware "settles" (e.g., 1 second after a cable is plugged).
+        self.refresh_timer = QTimer()
+        self.refresh_timer.setSingleShot(True)
+        self.refresh_timer.timeout.connect(self.reload_hardware_state)
+
+        # --- 2. The OS Signal Connections ---
+        # We hook into the global application instance's screen signals.
+        from PySide6.QtWidgets import QApplication
+        app_inst = QApplication.instance()
+        app_inst.screenAdded.connect(self.trigger_refresh)
+        app_inst.screenRemoved.connect(self.trigger_refresh)
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -185,6 +199,7 @@ class MainWindow(QMainWindow):
     def commit_changes(self):
         """Saves staged metadata to profiles.json and applies wallpapers."""
         if not self.canvas.pending_clips:
+            print('DEBUG: No pending clips to commit')
             return
 
         # 1. Update the profile with new assignments
@@ -221,6 +236,24 @@ class MainWindow(QMainWindow):
         # 3. Apply everything to prevent mirroring
         self.setter.apply_all_saved(self.monitors, clips)
 
+    def reload_hardware_state(self):
+        """Full re-scan and UI refresh"""
+        print("Hardware change detected! Re-scanning...")
+        # 1. Re-scan the actual hardware
+        new_monitors = self.engine.get_monitor_data()
+
+        # 2. Update the Topology Canvas (Moves active to inactive or vice-versa)
+        self.canvas.display_monitors(new_monitors)
+
+        # 3. Re-apply wallpapers
+        # This ensures that if a monitor was re-plugged, its saved image
+        # from the profile is pushed back to the screen immediately.
+        profile_data = self.cfg.get_active_profile_data()
+        pref = self.cfg.get_setting("link_preference", "device")
+        self.setter.apply_all_saved(new_monitors, profile_data, pref)
+
+        print(f"Topology auto-resolved: {len(new_monitors)} active displays.")
+
     def set_application_icon(self):
         # Use the root_dir from our config manager to build a rock-solid path
         icon_path = self.cfg.root_dir / "assets" / "icons" / "pc-logo.png"
@@ -239,3 +272,8 @@ class MainWindow(QMainWindow):
         is_checked = (state == 2 or state == Qt.CheckState.Checked)
         self.cfg.toggle_autostart(is_checked)
         print(f"Autostart enabled: {is_checked}")
+
+    def trigger_refresh(self, *args):
+        """Called immediately by the OS when a port changes."""
+        # Restarts the timer; if another event hits within 1s, it resets.
+        self.refresh_timer.start(1000)

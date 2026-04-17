@@ -63,6 +63,12 @@ class ConfigManager:
         profiles_data = self._load_json(self.profiles_file).get("profiles", {})
         return profiles_data.get(active_name, {})
 
+    def get_profile(self, key, default=None):
+        json = self._load_json(self.profiles_file)
+        json = json.get("profiles")
+        json = json.get(key, default)
+        return json
+
     def get_setting(self, key, default=None):
         return self._load_json(self.settings_file).get(key, default)
 
@@ -70,16 +76,48 @@ class ConfigManager:
         """Checks the setting in settings.json to see if autostart should be active."""
         return self.get_setting("autostart", False)
 
+    def remove_monitor_from_profile(self, device_id):
+        """
+        Removes a monitor entry from the active profile and re-indexes.
+        """
+        # 1. Identify the active profile name
+        active_name = self.get_setting("active_profile", "default_profile")
+
+        # 2. Access the profile dictionary from the profiles object
+        if not hasattr(self, 'profiles_file') or not self.get_profile(active_name, False):
+            return False
+
+        profile_content = self.get_profile(active_name)
+
+        # 3. Find the key to delete
+        target_key = None
+
+        for key, entry in profile_content.items():
+            if entry.get('device_id') == device_id:
+                target_key = key
+                break
+
+        if target_key is not None:
+            del profile_content[target_key]
+            profiles = self._load_json(self.profiles_file)
+            profiles["profiles"][active_name] = profile_content
+            self._save_json(self.profiles_file, profiles)
+
+        return
+
     def save_to_profile(self, index, monitor_info):
         """
         Saves a rich metadata block to the active profile in profiles.json.
         monitor_info: {image, device_id, device_name, port, is_active}
         """
-        active_name = self.get_setting("active_profile", "default_profile")
+        active_name = self.get_setting("active_profile", False)
+        if not active_name: return
+
         full_data = self._load_json(self.profiles_file)
 
         if "profiles" not in full_data:
             full_data["profiles"] = {}
+
         if active_name not in full_data["profiles"]:
             full_data["profiles"][active_name] = {}
 
