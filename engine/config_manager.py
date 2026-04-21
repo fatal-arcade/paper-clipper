@@ -9,11 +9,11 @@ class ConfigManager:
     def __init__(self):
         self.root_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         self.portable_flag = self.root_dir / "portable.mode"
-        self.config_dir = self._resolve_config_path()
+        self.conf_dir = self._resolve_config_path()
 
         # The Two-File Architecture
-        self.settings_file = self.config_dir / "settings.json"
-        self.profiles_file = self.config_dir / "profiles.json"
+        self.settings_file = self.conf_dir / "settings.json"
+        self.profiles_file = self.conf_dir / "profiles.json"
 
     def _load_json(self, file_path):
         try:
@@ -33,7 +33,7 @@ class ConfigManager:
 
     def ensure_config_exists(self):
         """Initializes both files with their distinct default structures."""
-        self.config_dir.mkdir(parents=True, exist_ok=True)
+        self.conf_dir.mkdir(parents=True, exist_ok=True)
 
         if not self.settings_file.exists():
             self._save_json(self.settings_file, {

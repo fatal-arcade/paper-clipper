@@ -192,7 +192,7 @@ class MonitorCanvas(QGraphicsView):
         self.scene.clear()
 
         # 1. Pull the profile history from the config manager
-        profile_data = self.window().cfg.get_active_profile_data()
+        profile_data = self.window().conf_mgr.get_active_profile_data()
         live_ids = {m['id'] for m in active_hw}
 
         render_list = []

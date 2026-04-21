@@ -1,4 +1,3 @@
-import os
 from ui.components      import MonitorCanvas
 from PySide6.QtGui      import (
     QAction,
@@ -27,74 +26,164 @@ from PySide6.QtWidgets import (
 class MainWindow(QMainWindow):
 
     def __init__(self, monitors, config_manager, setter, engine):
+
         super().__init__()
+
+        def build_sidebar_panel() -> QFrame:
+            frame = QFrame()
+            frame.setFixedWidth(220)
+            frame.setStyleSheet("""
+                background-color: #252526;
+                border-right: 1px solid #333;
+            """)
+            self.sidebar_layout =  QVBoxLayout(frame)
+            return frame
+
+        def build_autostart_section() -> QCheckBox:
+            cbox = QCheckBox("Start on Boot")
+            cbox.setStyleSheet("""
+                        QCheckBox {
+                            spacing: 8px;
+                            color: #e0e0e0;
+                            font-family: "Segoe UI", sans-serif;
+                        }
+
+                        QCheckBox::indicator {
+                            width: 45px;
+                            height: 22px;
+                            border-radius: 11px;
+                        }
+
+                        /* The Background when OFF */
+                        QCheckBox::indicator:unchecked {
+                            background-color: #3d3d3d;
+                            border: 1px solid #555;
+                        }
+
+                        /* The Background when ON */
+                        QCheckBox::indicator:checked {
+                            background-color: #2ecc71;
+                            border: 1px solid #27ae60;
+                        }
+
+                        /* The "Handle" (using an image or drawing a circle) */
+                        /* We use a pseudo-element trick or a small icon */
+                        QCheckBox::indicator:unchecked:hover {
+                            background-color: #4a4a4a;
+                        }
+                    """)
+            cbox.setChecked(self.conf_mgr.is_autostart_enabled())
+            cbox.stateChanged.connect(self.toggle_boot)
+            return cbox
+
+        def build_profile_section() -> QVBoxLayout:
+
+            label = QLabel("PROFILES")
+            label.setStyleSheet("""
+                color: #666;
+                font-weight: bold;
+                font-size: 14px;
+                margin-top: 10px;
+            """)
+
+            current = self.conf_mgr.get_setting("active_profile", "default_profile")
+            self.profile = QComboBox()
+            self.profile.addItems(["Default"])
+            self.profile.setCurrentText("Default" if current == "default_profile" else current)
+            #self.link_preference.currentTextChanged.connect(self._handle_pref_change)
+
+            layout = QVBoxLayout()
+            layout.addWidget(label)
+            layout.addWidget(self.profile)
+            return layout
+
+        def build_link_preference_section() -> QVBoxLayout:
+
+            label = QLabel("LINK PREFERENCE")
+            label.setStyleSheet("""
+                color: #666;
+                font-weight: bold;
+                font-size: 14px;
+                margin-top: 10px;
+            """)
+
+            current = self.conf_mgr.get_setting("link_preference", "device")
+            self.link_preference = QComboBox()
+            self.link_preference.addItems(["Device-Centric", "Port-Centric"])
+            self.link_preference.setCurrentText("Device-Centric" if current == "device" else "Port-Centric")
+            self.link_preference.currentTextChanged.connect(self._handle_pref_change)
+
+            layout = QVBoxLayout()
+            layout.addWidget(label)
+            layout.addWidget(self.link_preference)
+            return layout
+
+        def debounce_timer() -> None:
+            """Ensures only one refresh occurs 1 second after a hardware event completes"""
+            self.refresh_timer = QTimer()
+            self.refresh_timer.setSingleShot(True)
+            self.refresh_timer.timeout.connect(self.reload_hardware_state)
+
+        def global_hardware_listener() -> None:
+            """Hooks into the global application instance's screen signals"""
+            app_instance = QApplication.instance()
+            app_instance.screenAdded.connect(self.trigger_refresh)
+            app_instance.screenRemoved.connect(self.trigger_refresh)
+
         self.monitors = monitors
-        self.cfg = config_manager
+        self.conf_mgr = config_manager
         self.setter = setter
         self.engine = engine
+
         self.setWindowTitle("PaperClipper")
         self.resize(1100, 700) # Slightly larger to accommodate the shelf
 
-        # --- 1. The Debounce Timer ---
-        # Hardware events can be noisy; this ensures we only refresh once
-        # after the hardware "settles" (e.g., 1 second after a cable is plugged).
-        self.refresh_timer = QTimer()
-        self.refresh_timer.setSingleShot(True)
-        self.refresh_timer.timeout.connect(self.reload_hardware_state)
-
-        # --- 2. The OS Signal Connections ---
-        # We hook into the global application instance's screen signals.
-        from PySide6.QtWidgets import QApplication
-        app_inst = QApplication.instance()
-        app_inst.screenAdded.connect(self.trigger_refresh)
-        app_inst.screenRemoved.connect(self.trigger_refresh)
+        debounce_timer()
+        global_hardware_listener()
 
         central = QWidget()
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # --- Sidebar ---
-        self.sidebar = QFrame()
-        self.sidebar.setFixedWidth(220)
-        self.sidebar.setStyleSheet("background-color: #252526; border-right: 1px solid #333;")
-        side_layout = QVBoxLayout(self.sidebar)
+        # --- constructing the sidebar panel ---
+        self.sidebar = build_sidebar_panel()
 
-        # Settings: Link Preference
-        lbl_pref = QLabel("LINK PREFERENCE")
-        lbl_pref.setStyleSheet("color: #555; font-weight: bold; font-size: 10px; margin-top: 10px;")
-        side_layout.addWidget(lbl_pref)
+        # profile section
+        self.sidebar_layout.addLayout(build_profile_section())
+        self.sidebar_layout.addSpacing(20)
 
-        self.pref_combo = QComboBox()
-        self.pref_combo.addItems(["Device-Centric", "Port-Centric"])
-        current_pref = self.cfg.get_setting("link_preference", "device")
-        self.pref_combo.setCurrentText("Device-Centric" if current_pref == "device" else "Port-Centric")
-        self.pref_combo.currentTextChanged.connect(self._handle_pref_change)
-        side_layout.addWidget(self.pref_combo)
+        # link preference section
+        self.sidebar_layout.addLayout(build_link_preference_section())
+        self.sidebar_layout.addSpacing(20)
 
-        # Settings: Autostart
-        self.auto_cb = QCheckBox("Start on Boot")
-        self.auto_cb.setStyleSheet("color: #ccc; margin-top: 10px;")
-        self.auto_cb.setChecked(self.cfg.is_autostart_enabled())
-        self.auto_cb.stateChanged.connect(self.toggle_boot)
-        side_layout.addWidget(self.auto_cb)
-
-        side_layout.addSpacing(20)
+        # autostart section
+        self.sidebar_layout.addWidget(build_autostart_section())
+        self.sidebar_layout.addSpacing(20)
 
         # Actions
-        self.apply_btn = QPushButton("Commit Changes")
+        self.apply_btn = QPushButton("Save Profile")
         self.apply_btn.setStyleSheet("""
-            QPushButton { background-color: #0e639c; color: white; border: none; padding: 8px; border-radius: 2px; }
-            QPushButton:hover { background-color: #1177bb; }
+            QPushButton {
+                background-color: #0e639c;
+                color: white;
+                border: none;
+                padding: 8px;
+                border-radius: 2px;
+            }
+            QPushButton:hover {
+                background-color: #1177bb;
+            }
         """)
         self.apply_btn.clicked.connect(self.commit_changes)
-        side_layout.addWidget(self.apply_btn)
+        self.sidebar_layout.addWidget(self.apply_btn)
+        self.sidebar_layout.addSpacing(10)
 
-        self.refresh_btn = QPushButton("Scan Hardware")
+        self.refresh_btn = QPushButton("Scan For New Hardware")
         self.refresh_btn.clicked.connect(self._handle_hardware_change)
-        side_layout.addWidget(self.refresh_btn)
+        self.sidebar_layout.addWidget(self.refresh_btn)
 
-        side_layout.addStretch()
+        self.sidebar_layout.addStretch()
 
         # --- Canvas ---
         self.canvas = MonitorCanvas()
@@ -129,7 +218,7 @@ class MainWindow(QMainWindow):
 
     def _handle_pref_change(self, text):
         pref = "device" if "Device" in text else "port"
-        self.cfg.set_setting("link_preference", pref)
+        self.conf_mgr.set_setting("link_preference", pref)
         print(f"Logic Pivot: Matching now set to {pref}")
 
     def _on_tray_activated(self, reason):
@@ -156,7 +245,7 @@ class MainWindow(QMainWindow):
 
     def _setup_tray(self):
         self.tray = QSystemTrayIcon(self)
-        icon_path = self.cfg.root_dir / "assets" / "icons" / "pc-logo.png"
+        icon_path = self.conf_mgr.root_dir / "assets" / "icons" / "pc-logo.png"
 
         if icon_path.exists():
             self.tray.setIcon(QIcon(str(icon_path)))
@@ -191,8 +280,8 @@ class MainWindow(QMainWindow):
 
     def apply_all_current(self):
         """Passes the rich profile data and preference to the setter."""
-        profile_data = self.cfg.get_active_profile_data()
-        pref = self.cfg.get_setting("link_preference", "device")
+        profile_data = self.conf_mgr.get_active_profile_data()
+        pref = self.conf_mgr.get_setting("link_preference", "device")
 
         # The setter now handles the dictionary-to-list matching logic internally
         self.setter.apply_all_saved(self.monitors, profile_data, pref)
@@ -225,7 +314,7 @@ class MainWindow(QMainWindow):
                 }
                 # We use the list index for the profiles.json slot
                 idx = self.monitors.index(m_obj)
-                self.cfg.save_to_profile(idx, info)
+                self.conf_mgr.save_to_profile(idx, info)
 
         self.canvas.pending_clips = {}
 
@@ -236,10 +325,10 @@ class MainWindow(QMainWindow):
     def handle_wallpaper_selection(self, monitor_id, image_path):
         """Saves the clip and refreshes the entire desktop state."""
         # 1. Save the new clip
-        self.cfg.save_clip(monitor_id, image_path)
+        self.conf_mgr.save_clip(monitor_id, image_path)
 
         # 2. Get the updated clips list
-        settings = self.cfg.load_settings()
+        settings = self.conf_mgr.load_settings()
         clips = settings.get("clips", {})
 
         # 3. Apply everything to prevent mirroring
@@ -257,15 +346,15 @@ class MainWindow(QMainWindow):
         # 3. Re-apply wallpapers
         # This ensures that if a monitor was re-plugged, its saved image
         # from the profile is pushed back to the screen immediately.
-        profile_data = self.cfg.get_active_profile_data()
-        pref = self.cfg.get_setting("link_preference", "device")
+        profile_data = self.conf_mgr.get_active_profile_data()
+        pref = self.conf_mgr.get_setting("link_preference", "device")
         self.setter.apply_all_saved(new_monitors, profile_data, pref)
 
         print(f"Topology auto-resolved: {len(new_monitors)} active displays.")
 
     def set_application_icon(self):
         # Use the root_dir from our config manager to build a rock-solid path
-        icon_path = self.cfg.root_dir / "assets" / "icons" / "pc-logo.png"
+        icon_path = self.conf_mgr.root_dir / "assets" / "icons" / "pc-logo.png"
 
         if icon_path.exists():
             icon = QIcon(str(icon_path))
@@ -279,7 +368,7 @@ class MainWindow(QMainWindow):
         # In PySide6, state can be an integer or a CheckState enum
         # 2 is Checked, 0 is Unchecked
         is_checked = (state == 2 or state == Qt.CheckState.Checked)
-        self.cfg.toggle_autostart(is_checked)
+        self.conf_mgr.toggle_autostart(is_checked)
         print(f"Autostart enabled: {is_checked}")
 
     def trigger_refresh(self, *args):
