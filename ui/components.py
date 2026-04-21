@@ -1,48 +1,105 @@
 import os
-from PySide6.QtCore     import Qt, QTimer
-from PySide6.QtGui      import QBrush, QColor, QPen, QPainter, QPixmap, QAction
+from PySide6.QtCore     import (
+    Qt,
+    QTimer
+)
+from PySide6.QtGui      import (
+    QAction,
+    QBrush,
+    QColor,
+    QIcon,
+    QPainter,
+    QPen,
+    QPixmap
+)
 from PySide6.QtWidgets  import (
-    QDialog, QVBoxLayout, QLabel, QPushButton,
-    QHBoxLayout, QGraphicsView, QGraphicsScene,
-    QGraphicsRectItem, QFileDialog, QMenu
+    QDialog,
+    QFileDialog,
+    QGraphicsRectItem,
+    QGraphicsScene,
+    QGraphicsView,
+    QHBoxLayout,
+    QLabel,
+    QMenu,
+    QPushButton,
+    QVBoxLayout
 )
 
-class FirstRunDialog(QDialog):
-    """Initial setup dialog to choose between Standard and Portable modes."""
+class InitialSetupDialog(QDialog):
 
-    # ---- DUNDER / MAGIC METHODS ----
+    choice = None
 
     def __init__(self):
+
         super().__init__()
-        self.setWindowTitle("PaperClipper Setup")
-        self.setFixedSize(400, 250)
+
+        def build_button_panel() -> QHBoxLayout:
+
+            def set_choice(mode) -> None:
+                print(f'{mode} initialization selected.')
+                self.choice = mode
+                self.accept()
+
+            portable_button = QPushButton("Portable")
+            portable_button.clicked.connect(lambda: set_choice(mode="PORTABLE"))
+            standard_button = QPushButton("Standard")
+            standard_button.clicked.connect(lambda: set_choice(mode="STANDARD"))
+            button_layout = QHBoxLayout()
+            button_layout.addWidget(portable_button)
+            button_layout.addWidget(standard_button)
+            self.choice = None
+            return button_layout
+
+        def build_lower_panel() -> QVBoxLayout:
+
+            def compose_text() -> str:
+                return f'''
+                    <b>Choose your settings storage mode:</b><br><br>
+                    {"&nbsp;" * 4}• Standard - All files will be stored at "~/.config/paper-clipper"<br><br>
+                    {"&nbsp;" * 4}• Portable - All files will be stored in the application directory
+                '''
+
+
+            label  = QLabel(text=compose_text())
+            layout = QVBoxLayout()
+            layout.addWidget(label)
+            return layout
+
+        def build_upper_panel() -> QHBoxLayout:
+
+            def compose_text() -> str:
+                return "<b>PaperClipper</b>"
+
+            image = QLabel(pixmap=QPixmap(self.image_path), scaledContents=True)
+            image.setFixedSize(128, 128)
+            label = QLabel(text=compose_text(), wordWrap=True)
+            layout = QHBoxLayout()
+            layout.addWidget(image)
+            layout.addSpacing(10)
+            layout.addWidget(label)
+            return layout
+
+        def get_image_filepath() -> str:
+            img = os.path.dirname(os.path.abspath(__file__))
+            img = os.path.dirname(img)
+            return os.path.join(img, 'assets', 'icons', 'pc-logo.png')
+
+        self.image_path = get_image_filepath()
+        self.setFixedSize(400, 300)
+        self.setWindowTitle("Initial Setup")
+        self.setWindowIcon(QIcon(self.image_path))
+
+        top_panel = build_upper_panel()
+        btm_panel = build_lower_panel()
+        btn_panel = build_button_panel()
+
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("<b>Welcome to PaperClipper</b>"))
-        layout.addWidget(QLabel("Choose your settings storage mode:"))
-
-        btn_layout = QHBoxLayout()
-        self.btn_std = QPushButton("Standard (~/.config)")
-        self.btn_port = QPushButton("Portable (Local Folder)")
-        btn_layout.addWidget(self.btn_std)
-        btn_layout.addWidget(self.btn_port)
-        layout.addLayout(btn_layout)
-
-        self.choice = None
-        self.btn_std.clicked.connect(lambda: self.set_choice("STANDARD"))
-        self.btn_port.clicked.connect(lambda: self.set_choice("PORTABLE"))
-
-    # ---- PRIVATE METHODS ----
-
-    # ---- PUBLIC METHODS ----
-
-    def set_choice(self, mode):
-        self.choice = mode
-        self.accept()
+        layout.addLayout(top_panel)
+        layout.addLayout(btm_panel)
+        layout.addLayout(btn_panel)
 
 class MonitorItem(QGraphicsRectItem):
     """Visual representation of a monitor (Live or Ghost)."""
-
-    # ---- DUNDER / MAGIC METHODS ----
 
     def __init__(self, x, y, w, h, monitor_data, image_path=None, is_staged=False, is_ghost=False):
         super().__init__(x, y, w, h)
@@ -88,10 +145,6 @@ class MonitorItem(QGraphicsRectItem):
         else:
             self.setBrush(QBrush(QColor("#1a1a1a")))
 
-    # ---- PRIVATE METHODS ----
-
-    # ---- PUBLIC METHODS ----
-
     def contextMenuEvent(self, event):
         # We use the attribute self.is_ghost which we set during __init__
         if not self.is_ghost:
@@ -119,8 +172,6 @@ class MonitorItem(QGraphicsRectItem):
 class MonitorCanvas(QGraphicsView):
     """The interactive topology map containing live and ghost monitors."""
 
-    # ---- DUNDER / MAGIC METHODS ----
-
     def __init__(self):
         super().__init__()
         self.scene = QGraphicsScene(self)
@@ -132,8 +183,6 @@ class MonitorCanvas(QGraphicsView):
         self.resize_timer = QTimer()
         self.resize_timer.setSingleShot(True)
         self.resize_timer.timeout.connect(self._perform_render)
-
-    # ---- PRIVATE METHODS ----
 
     def _perform_render(self):
         active_hw = getattr(self, 'current_monitors', [])
@@ -266,8 +315,6 @@ class MonitorCanvas(QGraphicsView):
 
         self.setSceneRect(self.scene.itemsBoundingRect().adjusted(-50, -50, 50, 50))
         self.centerOn(self.scene.itemsBoundingRect().center())
-
-    # ---- PUBLIC METHODS ----
 
     def display_monitors(self, monitors):
         self.current_monitors = monitors

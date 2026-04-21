@@ -1,17 +1,30 @@
 import os
 from ui.components      import MonitorCanvas
-from PySide6.QtGui      import QIcon, QAction, QGuiApplication
-from PySide6.QtCore     import Qt, QTimer
-from PySide6.QtWidgets  import (
-    QMainWindow, QHBoxLayout, QVBoxLayout,
-    QWidget, QFrame, QLabel, QApplication,
-    QCheckBox, QPushButton, QSystemTrayIcon,
-    QMenu, QComboBox
+from PySide6.QtGui      import (
+    QAction,
+    QGuiApplication,
+    QIcon
+)
+from PySide6.QtCore     import (
+    Qt,
+    QTimer
+)
+from PySide6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMenu,
+    QPushButton,
+    QSystemTrayIcon,
+    QVBoxLayout,
+    QWidget
 )
 
 class MainWindow(QMainWindow):
-
-    # ---- DUNDER / MAGIC METHODS ----
 
     def __init__(self, monitors, config_manager, setter, engine):
         super().__init__()
@@ -92,8 +105,6 @@ class MainWindow(QMainWindow):
         self._setup_hardware_listener()
         self.set_application_icon()
         self._setup_tray()
-
-    # ---- PRIVATE METHODS ----
 
     def _handle_hardware_change(self, *args):
         """Re-scans hardware and updates the UI automatically."""
@@ -177,8 +188,6 @@ class MainWindow(QMainWindow):
 
         # Handle double click on tray icon
         self.tray.activated.connect(self._on_tray_activated)
-
-    # ---- PUBLIC METHODS ----
 
     def apply_all_current(self):
         """Passes the rich profile data and preference to the setter."""

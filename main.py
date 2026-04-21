@@ -1,28 +1,43 @@
 import sys
+from datetime               import datetime
 from PySide6.QtWidgets      import QApplication
 from engine.config_manager  import ConfigManager
 from engine.hardware        import HardwareEngine, WallpaperSetter
+from ui.components          import InitialSetupDialog
 from ui.main_window         import MainWindow
 
-
 def main():
+
+    # system tray & hardware listener
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
-    # 1. Initialize Config
+    # 1. Configuration Bootstrap
     cfg = ConfigManager()
 
-    # (First-run / Portable logic remains here...)
+    # Check for First Run
+    # If settings.json doesn't exist, we need to know where the user wants to store data.
     if not cfg.settings_file.exists():
-        # ... [Existing FirstRunDialog Logic] ...
-        pass
+        first_run = InitialSetupDialog()
+        if first_run.exec():
+            match first_run.choice:
+                case "STANDARD":
+                    if cfg.portable_flag.exists(): del cfg.portable_flag
+                case "PORTABLE":
+                    cfg.portable_flag.write_text(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                    cfg = ConfigManager()
+                case _:
+                    sys.exit(0)
+        else:
+            # If they cancel the setup wizard, we exit.
+            sys.exit(0)
 
     cfg.ensure_config_exists()
 
     # 2. Initialize Engines
-    engine = HardwareEngine()
+    engine   = HardwareEngine()
     monitors = engine.get_monitor_data()
-    setter = WallpaperSetter()
+    setter   = WallpaperSetter()
 
     # 3. Smart Startup Logic
     # We always pull the data so the UI knows what is "saved"

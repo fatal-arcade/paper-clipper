@@ -7,12 +7,8 @@ from pathlib import Path
 
 class HardwareEngine:
 
-    # ---- DUNDER / MAGIC METHODS ----
-
     def __init__(self):
         self.drm_path = Path("/sys/class/drm")
-
-    # ---- PRIVATE METHODS ----
 
     def _get_device_name_from_edid(self, edid_data):
         """
@@ -29,8 +25,6 @@ class HardwareEngine:
         except:
             pass
         return "Unknown Display"
-
-    # ---- PUBLIC METHODS ----
 
     def get_monitor_data(self):
         """
@@ -89,12 +83,8 @@ class HardwareEngine:
 
 class WallpaperSetter:
 
-    # ---- DUNDER / MAGIC METHODS ----
-
     def __init__(self):
         self.desktop_env = self._get_desktop_environment()
-
-    # ---- PRIVATE METHODS ----
 
     def _dispatch_batch(self, image_paths, monitors):
         """Determines the best command to set multiple backgrounds at once."""
@@ -150,8 +140,6 @@ class WallpaperSetter:
         if not de:
             de = os.environ.get("DESKTOP_SESSION", "").upper()
         return de
-
-    # ---- PUBLIC METHODS ----
 
     def apply(self, image_path, port=None):
         """Runs the system command to set the wallpaper for a specific port."""

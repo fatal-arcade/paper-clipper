@@ -1,12 +1,10 @@
-import json
-import sys
 import os
+import sys
+import json
 from pathlib    import Path
 from datetime   import datetime
 
 class ConfigManager:
-
-    # ---- DUNDER / MAGIC METHODS ----
 
     def __init__(self):
         self.root_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,10 +14,6 @@ class ConfigManager:
         # The Two-File Architecture
         self.settings_file = self.config_dir / "settings.json"
         self.profiles_file = self.config_dir / "profiles.json"
-
-        self.ensure_config_exists()
-
-    # ---- PRIVATE METHODS ----
 
     def _load_json(self, file_path):
         try:
@@ -36,8 +30,6 @@ class ConfigManager:
     def _save_json(self, file_path, data):
         with open(file_path, "w") as f:
             json.dump(data, f, indent=4)
-
-    # ---- PUBLIC METHODS ----
 
     def ensure_config_exists(self):
         """Initializes both files with their distinct default structures."""
